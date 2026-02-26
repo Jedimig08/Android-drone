@@ -28,8 +28,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -79,10 +85,11 @@ fun DashboardPager(presets: List<SnapshotStateList<Module>>) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardPage(modules: List<Module>) {
+fun DashboardPage(modules: SnapshotStateList<Module>) {
 
-    var selectedModule by remember { mutableStateOf<Module?>(null) }
+    var selectedModule: Module? by remember { mutableStateOf<Module?>(null) }
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(4),          // 4 columns for landscape
@@ -103,20 +110,51 @@ fun DashboardPage(modules: List<Module>) {
 
         }
     }
+
     if (selectedModule != null) {
-        AlertDialog(
-            onDismissRequest = { selectedModule = null },
-            confirmButton = {
-                Button(onClick = { selectedModule = null }) {
-                    Text("Close")
+
+        var editedType by remember(selectedModule) {
+            mutableStateOf(selectedModule!!.type)
+        }
+
+        ModalBottomSheet(
+            onDismissRequest = { selectedModule = null }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+
+                Text("Edit Module")
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                TextField(
+                    value = editedType,
+                    onValueChange = { editedType = it },
+                    label = { Text("Module Type") }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = {
+                        val index = modules.indexOf(selectedModule)
+                        if (index != -1) {
+                            modules[index] =
+                                selectedModule!!.copy(type = editedType)
+                        }
+                        selectedModule = null
+                    }
+                ) {
+                    Text("Save")
                 }
-            },
-            text = {
-                Text("Editing ${selectedModule!!.type}")
             }
-        )
+        }
     }
 }
+
 
 @Composable
 fun ModuleView(module: Module, onEditRequest: (Module) -> Unit) {
