@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -117,6 +118,18 @@ fun DashboardPage(modules: SnapshotStateList<Module>) {
             mutableStateOf(selectedModule!!.type)
         }
 
+        var editedSpanX by remember(selectedModule) {
+            mutableStateOf(selectedModule!!.spanX.toString())
+        }
+
+        var editedAspRatio by remember(selectedModule) {
+            mutableStateOf(selectedModule!!.aspRatio.toString())
+        }
+
+        val index = modules.indexOf(selectedModule)
+
+        var moveToIndex by remember { mutableStateOf("") }
+
         ModalBottomSheet(
             onDismissRequest = { selectedModule = null }
         ) {
@@ -125,31 +138,93 @@ fun DashboardPage(modules: SnapshotStateList<Module>) {
                     .fillMaxWidth()
                     .padding(16.dp)
             ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+
+                    TextField(
+                        value = editedSpanX,
+                        onValueChange = { editedSpanX = it },
+                        label = { Text("Span") },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    TextField(
+                        value = editedAspRatio,
+                        onValueChange = { editedAspRatio = it },
+                        label = { Text("Ratio") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Text("Edit Module")
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                TextField(
-                    value = editedType,
-                    onValueChange = { editedType = it },
-                    label = { Text("Module Type") }
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = {
-                        val index = modules.indexOf(selectedModule)
-                        if (index != -1) {
-                            modules[index] =
-                                selectedModule!!.copy(type = editedType)
-                        }
-                        selectedModule = null
-                    }
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Save")
+
+                    TextField(
+                        value = moveToIndex,
+                        onValueChange = { moveToIndex = it },
+                        label = { Text("Move to index") },
+                        singleLine = true
+                    )
+
+                    TextField(
+                        value = editedType,
+                        onValueChange = { editedType = it },
+                        label = { Text("Module Type") }
+                    )
+
                 }
+                Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = {
+                            if (index != -1) {
+                                modules[index] =
+                                    selectedModule!!.copy(type = editedType)
+                            }
+
+                            val targetSpan: Int? = moveToIndex.toIntOrNull()
+
+                            if (targetSpan != null) {
+                                if (index != -1) {
+                                    modules[index] =
+                                        selectedModule!!.copy(spanX = targetSpan)
+                                }
+                            }
+                            val targetRatio: Float? = moveToIndex.toFloatOrNull()
+                            if (targetRatio != null){
+                                if (index != -1) {
+                                    modules[index] =
+                                        selectedModule!!.copy(aspRatio = targetRatio)
+                                }
+                            }
+                            val targetIndex = moveToIndex.toIntOrNull()
+
+                            if (targetIndex != null) {
+                                // Find current index safely
+                                val currentIndex = modules.indexOfFirst { it.id == selectedModule?.id }
+
+                                if (currentIndex != -1 && targetIndex in 0..modules.lastIndex) {
+                                    moveModule(modules, currentIndex, targetIndex)
+                                }
+                            }
+
+                            // Optional: clear input or close sheet
+                            moveToIndex = ""
+
+                            selectedModule = null
+                        }
+                    ) {
+                        Text("Save")
+                    }
             }
         }
     }
