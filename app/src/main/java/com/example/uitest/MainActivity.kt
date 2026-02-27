@@ -186,40 +186,33 @@ fun DashboardPage(modules: SnapshotStateList<Module>) {
 
                     Button(
                         onClick = {
-                            if (index != -1) {
-                                modules[index] =
-                                    selectedModule!!.copy(type = editedType)
-                            }
+                            val currentIndex =
+                            modules.indexOfFirst { it.id == selectedModule?.id }
 
-                            val targetSpan: Int? = moveToIndex.toIntOrNull()
+                            if (currentIndex != -1) {
 
-                            if (targetSpan != null) {
-                                if (index != -1) {
-                                    modules[index] =
-                                        selectedModule!!.copy(spanX = targetSpan)
-                                }
-                            }
-                            val targetRatio: Float? = moveToIndex.toFloatOrNull()
-                            if (targetRatio != null){
-                                if (index != -1) {
-                                    modules[index] =
-                                        selectedModule!!.copy(aspRatio = targetRatio)
-                                }
-                            }
-                            val targetIndex = moveToIndex.toIntOrNull()
+                                val newSpan = editedSpanX.toIntOrNull() ?: modules[currentIndex].spanX
+                                val newRatio = editedAspRatio.toFloatOrNull() ?: modules[currentIndex].aspRatio
 
-                            if (targetIndex != null) {
-                                // Find current index safely
-                                val currentIndex = modules.indexOfFirst { it.id == selectedModule?.id }
+                                // Update module FIRST
+                                modules[currentIndex] =
+                                    modules[currentIndex].copy(
+                                        type = editedType,
+                                        spanX = newSpan,
+                                        aspRatio = newRatio
+                                    )
 
-                                if (currentIndex != -1 && targetIndex in 0..modules.lastIndex) {
+                                // THEN handle moving
+                                val targetIndex = moveToIndex.toIntOrNull()
+
+                                if (targetIndex != null &&
+                                    targetIndex in 0..modules.lastIndex
+                                ) {
                                     moveModule(modules, currentIndex, targetIndex)
                                 }
                             }
 
-                            // Optional: clear input or close sheet
                             moveToIndex = ""
-
                             selectedModule = null
                         }
                     ) {
