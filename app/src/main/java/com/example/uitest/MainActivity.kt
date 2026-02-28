@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -40,32 +41,18 @@ import androidx.compose.material3.TextField
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
 
 class MainActivity : ComponentActivity() {
+
+    private val viewModel: DashboardViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            val preset1 = remember {
-                mutableStateListOf(
-                    Module("battery", "sensor", 1, 2f),
-                    Module("cpu", "sensor", 1, 2f),
-                    Module("gps", "sensor", 1, 2f),
-                    Module("video", "video", 4, 1f)
-                )
-            }
 
-            val preset2 = remember {
-                mutableStateListOf(
-                    Module("imu", "sensor", 1, 2f),
-                    Module("altitude", "sensor", 2,1f),
-                    Module("logs", "log", 2, 1f)
-                )
-            }
-
-            val presets = listOf(preset1, preset2)
-
-            DashboardPager(presets = presets)
+            DashboardPager(presets = viewModel.presets)
         }
     }
 }
@@ -255,3 +242,21 @@ data class Module(
     val spanX: Int,
     val aspRatio: Float
 )
+
+class DashboardViewModel : ViewModel() {
+
+    val preset1 = mutableStateListOf(
+        Module("battery", "sensor", 1, 2f),
+        Module("cpu", "sensor", 1, 2f),
+        Module("gps", "sensor", 1, 2f),
+        Module("video", "video", 4, 1f)
+    )
+
+    val preset2 = mutableStateListOf(
+        Module("imu", "sensor", 1, 2f),
+        Module("altitude", "sensor", 2, 1f),
+        Module("logs", "log", 2, 1f)
+    )
+
+    val presets = listOf(preset1, preset2)
+}
