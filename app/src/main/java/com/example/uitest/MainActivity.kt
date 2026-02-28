@@ -200,7 +200,6 @@ fun DashboardPage(modules: SnapshotStateList<Module>) {
                                         aspRatio = newRatio
                                     )
 
-                                // THEN handle moving
                                 val targetIndex = moveToIndex.toIntOrNull()
 
                                 if (targetIndex != null &&
