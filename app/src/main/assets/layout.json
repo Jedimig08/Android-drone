@@ -1,0 +1,17 @@
+{
+  "layoutfile": "",
+  "columns": 4,
+  "presets": {
+    "preset1": [
+      { "id": "battery", "type": "sensor", "spanX": 1, "aspRatio": 2},
+      { "id": "cpu", "type": "sensor", "spanX": 1, "aspRatio": 2},
+      { "id": "gps", "type": "sensor", "spanX": 1, "aspRatio": 2},
+      { "id": "video", "type": "video", "spanX": 4, "aspRatio": 2}
+    ],
+    "preset2": [
+      { "id": "imu", "type": "sensor", "spanX": 1, "aspRatio": 2},
+      { "id": "altitude", "type": "sensor", "spanX": 2, "aspRatio": 2},
+      { "id": "logs", "type": "log", "spanX": 2, "aspRatio": 2}
+    ]
+  }
+}

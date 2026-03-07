@@ -1,4 +1,4 @@
-package com.example.uitest.UI
+package com.example.uitest.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -23,6 +23,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,18 +32,30 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.uitest.data.ModuleConfig
 import com.example.uitest.util.moveModule
+import com.example.uitest.viewmodel.DashboardViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardPage(modules: SnapshotStateList<ModuleConfig>) {
+fun DashboardPage(
+    modules: SnapshotStateList<ModuleConfig>,
+    viewModel: DashboardViewModel = viewModel()
+) {
 
     var selectedModule: ModuleConfig? by remember { mutableStateOf(null) }
 
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.loadLayout(context)
+    }
+
     LazyVerticalGrid(
-        columns = GridCells.Fixed(4),          // 4 columns for landscape
+        columns = GridCells.Fixed(viewModel.columns),
         modifier = Modifier.fillMaxSize(),
         horizontalArrangement = Arrangement.run { spacedBy(8.dp) },
         verticalArrangement = Arrangement.spacedBy(8.dp),

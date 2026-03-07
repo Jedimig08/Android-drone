@@ -1,4 +1,4 @@
-package com.example.uitest.UI
+package com.example.uitest.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.fillMaxSize

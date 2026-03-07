@@ -6,8 +6,3 @@ data class ModuleConfig(
     val spanX: Int,
     val aspRatio: Float
 )
-
-data class ModuleRuntimeData(
-    val id: String,
-    val value: String
-)
