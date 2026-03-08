@@ -10,6 +10,7 @@ import com.example.uitest.data.LayoutRepository
 import com.example.uitest.data.ModuleConfig
 import com.example.uitest.data.Widget
 import android.app.Application
+import android.net.Uri
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.lifecycle.AndroidViewModel
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
@@ -34,6 +35,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         )
 
         repo.saveLayout(layout)
+    }
+
+    fun importLayout(uri: Uri) {
+        repo.importLayout(uri)
+        loadLayout()
     }
 }
 

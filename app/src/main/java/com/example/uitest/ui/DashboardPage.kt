@@ -1,5 +1,7 @@
 package com.example.uitest.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -46,6 +48,14 @@ fun DashboardPage(
 ) {
 
     var selectedModule: ModuleConfig? by remember { mutableStateOf(null) }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            viewModel.importLayout(it)
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.loadLayout()
@@ -186,6 +196,14 @@ fun DashboardPage(
                         }
                     ){
                         Text("Save")
+                    }
+
+                    Button(
+                        onClick = {
+                            launcher.launch("application/json")
+                        }
+                    ){
+                        Text("Load Layout")
                     }
                 }
             }

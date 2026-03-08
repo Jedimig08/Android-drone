@@ -1,6 +1,7 @@
 package com.example.uitest.data
 
 import android.content.Context
+import android.net.Uri
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -35,13 +36,13 @@ class LayoutRepository(private val context: Context) {
             }
         }
     }
-    /*fun copyLayout(){
-        .use { input ->
+    fun importLayout(uri: Uri) {
+        context.contentResolver.openInputStream(uri)?.use { input ->
             file.outputStream().use { output ->
                 input.copyTo(output)
             }
         }
-    }*/
+    }
     /** Load LayoutConfig from internal storage */
     fun loadLayout(): LayoutConfig {
         ensureFileExists()
