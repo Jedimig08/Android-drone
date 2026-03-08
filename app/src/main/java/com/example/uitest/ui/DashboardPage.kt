@@ -32,7 +32,6 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.uitest.data.ModuleConfig
 import com.example.uitest.util.moveModule
@@ -48,10 +47,8 @@ fun DashboardPage(
 
     var selectedModule: ModuleConfig? by remember { mutableStateOf(null) }
 
-    val context = LocalContext.current
-
     LaunchedEffect(Unit) {
-        viewModel.loadLayout(context)
+        viewModel.loadLayout()
     }
 
     LazyVerticalGrid(
@@ -143,39 +140,53 @@ fun DashboardPage(
 
                 }
                 Spacer(modifier = Modifier.height(12.dp))
-
-                Button(
-                    onClick = {
-                        val currentIndex =
-                            modules.indexOfFirst { it.id == selectedModule?.id }
-
-                        if (currentIndex != -1) {
-
-                            val newSpan = editedSpanX.toIntOrNull() ?: modules[currentIndex].spanX
-                            val newRatio = editedAspRatio.toFloatOrNull() ?: modules[currentIndex].aspRatio
-
-                            // Update module FIRST
-                            modules[currentIndex] =
-                                modules[currentIndex].copy(
-                                    type = editedType,
-                                    spanX = newSpan,
-                                    aspRatio = newRatio
-                                )
-
-                            val targetIndex = moveToIndex.toIntOrNull()
-
-                            if (targetIndex != null &&
-                                targetIndex in 0..modules.lastIndex
-                            ) {
-                                moveModule(modules, currentIndex, targetIndex)
-                            }
-                        }
-
-                        moveToIndex = ""
-                        selectedModule = null
-                    }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Save")
+                    Button(
+                        onClick = {
+                            val currentIndex =
+                                modules.indexOfFirst { it.id == selectedModule?.id }
+
+                            if (currentIndex != -1) {
+
+                                val newSpan =
+                                    editedSpanX.toIntOrNull() ?: modules[currentIndex].spanX
+                                val newRatio =
+                                    editedAspRatio.toFloatOrNull() ?: modules[currentIndex].aspRatio
+
+                                // Update module FIRST
+                                modules[currentIndex] =
+                                    modules[currentIndex].copy(
+                                        type = editedType,
+                                        spanX = newSpan,
+                                        aspRatio = newRatio
+                                    )
+
+                                val targetIndex = moveToIndex.toIntOrNull()
+
+                                if (targetIndex != null &&
+                                    targetIndex in 0..modules.lastIndex
+                                ) {
+                                    moveModule(modules, currentIndex, targetIndex)
+                                }
+                            }
+
+                            moveToIndex = ""
+                            selectedModule = null
+                        }
+                    ) {
+                        Text("Try")
+                    }
+
+                    Button(
+                        onClick = {
+                            viewModel.saveLayout()
+                        }
+                    ){
+                        Text("Save")
+                    }
                 }
             }
         }
