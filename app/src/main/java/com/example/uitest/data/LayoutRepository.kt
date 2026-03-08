@@ -35,7 +35,13 @@ class LayoutRepository(private val context: Context) {
             }
         }
     }
-
+    /*fun copyLayout(){
+        .use { input ->
+            file.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        }
+    }*/
     /** Load LayoutConfig from internal storage */
     fun loadLayout(): LayoutConfig {
         ensureFileExists()
