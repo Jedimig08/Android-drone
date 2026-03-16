@@ -13,8 +13,60 @@ import android.app.Application
 import android.net.Uri
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.uitest.data.ModuleData
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val termuxClient = TermuxClient()
+
+    var latestLine: String? = null
+        private set
+
+    init {
+        // Connect and start listening
+        viewModelScope.launch {
+            termuxClient.connect()
+            listenForUpdates()
+        }
+    }
+
+    private suspend fun listenForUpdates() {
+        // 1. Move the entire loop to the IO thread to keep UI smooth
+        withContext(Dispatchers.IO) {
+            try {
+                while (true) {
+                    val line = termuxClient.receiveLine() ?: break
+
+                    // 3. Switch back to Main only to update the UI state
+                    withContext(Dispatchers.Main) {
+                        latestLine = line
+                        updateLogModules(line)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                // 4. Cleanup so you don't leave "ghost" sockets open
+                termuxClient.disconnect()
+            }
+        }
+    }
+
+    fun updateLogModules(newText: String) {
+        statePresets.forEach { preset ->
+            for (i in preset.indices) {
+                val module = preset[i]
+                if (module.type == "log") {
+                    // We use .copy() to trigger a recomposition in Compose
+                    preset[i] = module.copy(data = ModuleData(data = newText))
+                }
+            }
+        }
+    }
     private val repo = LayoutRepository(application)
 
     var statePresets by mutableStateOf<List<SnapshotStateList<ModuleConfig>>>(emptyList())

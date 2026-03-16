@@ -221,16 +221,22 @@ fun ModuleView(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(module.aspRatio)
-            .background(Color.DarkGray)
+            .background(module.color)
             .combinedClickable(
                 onClick = { },
                 onLongClick = { onEditRequest(module) }
             ),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = module.type,
-            color = Color.White
-        )
+        if (module.data != null){
+            module.data.data
+        } else {
+            module.type
+        }?.let {
+            Text(
+                text = it,
+                color = Color.White
+            )
+        }
     }
 }
