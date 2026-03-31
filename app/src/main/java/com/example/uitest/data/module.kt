@@ -1,6 +1,8 @@
 package com.example.uitest.data
 
 import androidx.compose.ui.graphics.Color
+import kotlinx.serialization.Serializable
+
 data class ModuleConfig(
     val id: String,
     val type: String,
@@ -12,4 +14,10 @@ data class ModuleConfig(
 
 data class ModuleData(
     val data: String?
+)
+
+@Serializable
+data class TermuxMessage(
+    val type: String, // "LAYOUT" or "LOG"
+    val content: String // The actual JSON string or raw text
 )

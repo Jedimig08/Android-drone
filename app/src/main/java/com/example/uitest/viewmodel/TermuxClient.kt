@@ -1,6 +1,7 @@
 package com.example.uitest.viewmodel
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -16,13 +17,18 @@ class TermuxClient(private val host: String = "127.0.0.1", private val port: Int
 
     // Connect to Termux TCP server
     suspend fun connect() = withContext(Dispatchers.IO) {
-        try {
-            socket = Socket(host, port)
-            writer = PrintWriter(socket!!.getOutputStream(), true)
-            reader = BufferedReader(InputStreamReader(socket!!.getInputStream()))
-        } catch (e: Exception) {
-            e.printStackTrace()
-            // Optional: throw a custom error here so the ViewModel knows it failed
+        var connected = false
+        while (!connected) {
+            try {
+                socket = Socket(host, port)
+                writer = PrintWriter(socket!!.getOutputStream(), true)
+                reader = BufferedReader(InputStreamReader(socket!!.getInputStream()))
+                connected = true
+                println("Successfully connected to Termux!")
+            } catch (e: Exception) {
+                println("Connection failed, retrying in 2 seconds...")
+                delay(2000) // Wait 2 seconds before trying again
+            }
         }
     }
 

@@ -15,9 +15,12 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.uitest.data.ModuleData
+import com.example.uitest.data.TermuxMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+
 
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -30,21 +33,79 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         // Connect and start listening
         viewModelScope.launch {
             termuxClient.connect()
+            sendlayout()
             listenForUpdates()
         }
     }
 
+    private suspend fun sendlayout() {
+        try {
+            val currentLayout = LayoutConfig(
+                columns = columns,
+                presets = statePresets.toLayoutPresets()
+            )
+
+            val jsonString = Json.encodeToString(currentLayout)
+            termuxClient.send(jsonString)
+
+            println("Handshake: Layout sent to Termux successfully.")
+        } catch (e: Exception) {
+            println("Handshake failed: ${e.message}")
+        }
+    }
+
     private suspend fun listenForUpdates() {
-        // 1. Move the entire loop to the IO thread to keep UI smooth
+        val networkJson = Json { ignoreUnknownKeys = true }
+
         withContext(Dispatchers.IO) {
             try {
                 while (true) {
                     val line = termuxClient.receiveLine() ?: break
 
-                    // 3. Switch back to Main only to update the UI state
+                    withContext(Dispatchers.Main) {
+                        try {
+                            // 1. Always parse into the Envelope first
+                            val envelope = networkJson.decodeFromString<TermuxMessage>(line)
+
+                            // 2. Decide what to do based on the "type"
+                            when (envelope.type) {
+                                "LAYOUT" -> {
+                                    val newLayout = networkJson.decodeFromString<LayoutConfig>(envelope.content)
+                                    columns = newLayout.columns
+                                    statePresets = newLayout.toStatePresets()
+                                    latestLine = "Layout Refreshed"
+                                }
+                                "LOG" -> {
+                                    latestLine = envelope.content
+                                    updateLogModules(envelope.content)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // Fallback for raw strings if the envelope fails
+                            latestLine = "Error: Invalid Envelope"
+                        }
+                    }
+                }
+            } finally {
+                termuxClient.disconnect()
+            }
+        }
+    }
+    /*
+    private suspend fun listenForUpdates() {
+
+        val jsonParser = Json { ignoreUnknownKeys = true }
+
+        withContext(Dispatchers.IO) {
+            try {
+                while (true) {
+
+                    //this is just to test soon to be obselete
+                    val line = termuxClient.receiveLine() ?: break
                     withContext(Dispatchers.Main) {
                         latestLine = line
                         updateLogModules(line)
+                    //
                     }
                 }
             } catch (e: Exception) {
@@ -55,7 +116,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
     }
-
+    */
+    // just to test the termux connection to change the text on the module,
+    // soon to be obselete
     fun updateLogModules(newText: String) {
         statePresets.forEach { preset ->
             for (i in preset.indices) {
