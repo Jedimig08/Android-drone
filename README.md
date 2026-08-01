@@ -26,6 +26,9 @@ During development I also found myself repeatedly opening multiple applications:
 
 Rather than creating a fixed interface, CommandHub was designed from the beginning to be extensible. Dashboard layouts are generated from configurable JSON files, allowing different interfaces to be loaded without modifying the application's source code. The application can be used entirely on the Android device, alongside tools such as Termux, or remotely from another computer through its embedded Ktor web server and companion desktop discovery utility. The long-term goal is to create a flexible platform that adapts to many different robotics and embedded projects instead of being tied to a single device or workflow.
 
+<img width="829" height="372" alt="Screenshot_20260730_202411" src="https://github.com/user-attachments/assets/f8680d6b-0ff5-4c04-815a-982d2f359bfe" />
+
+
 ## Features
 
 CommandHub currently includes several major components:
