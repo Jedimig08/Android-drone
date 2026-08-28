@@ -30,12 +30,23 @@ import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import android.os.Build
 
+import kotlinx.serialization.Serializable
+
+
+
+@Serializable
+data class Resolution(val width: Int, val height: Int) {
+    override fun toString(): String = "${width}x$height"
+}
+
+@Serializable
 data class CameraInfo(
     val id: String,
     val facing: String,
     val type: String,
     val focalLength: Float,
-    val isPhysical: Boolean = true
+    val isPhysical: Boolean = true,
+    val supportedResolutions: List<Resolution> = emptyList()
 )
 
 class CameraManager(private val context: Context) {
@@ -46,6 +57,7 @@ class CameraManager(private val context: Context) {
     private var lastLifecycleOwner: LifecycleOwner? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private var activeCameraId: String? = null
+    private var activeResolution: Resolution? = null
 
     init {
         val future = ProcessCameraProvider.getInstance(context)
@@ -56,8 +68,9 @@ class CameraManager(private val context: Context) {
 
     fun isReady(): Boolean = cameraProvider != null
 
-    fun getFlow(cameraId: String): SharedFlow<ByteArray> {
-        val flow = cameraFlows.getOrPut(cameraId) {
+    fun getFlow(cameraId: String, width: Int = 640, height: Int = 480): SharedFlow<ByteArray> {
+        val flowKey = "$cameraId:$width:$height"
+        val flow = cameraFlows.getOrPut(flowKey) {
             MutableSharedFlow(
                 replay = 0,
                 extraBufferCapacity = 5,
@@ -67,8 +80,8 @@ class CameraManager(private val context: Context) {
         
         lastLifecycleOwner?.let { owner ->
             mainHandler.post {
-                if (activeCameraId != cameraId) {
-                    startCamera(owner, cameraId)
+                if (activeCameraId != cameraId || (activeResolution?.width != width) || (activeResolution?.height != height)) {
+                    startCamera(owner, cameraId, width, height)
                 }
             }
         }
@@ -77,15 +90,17 @@ class CameraManager(private val context: Context) {
     }
 
     @OptIn(ExperimentalCamera2Interop::class)
-    fun startCamera(lifecycleOwner: LifecycleOwner, cameraId: String) {
+    fun startCamera(lifecycleOwner: LifecycleOwner, cameraId: String, width: Int = 640, height: Int = 480) {
         val provider = cameraProvider ?: return
         lastLifecycleOwner = lifecycleOwner
         
-        // Stop everything else first to avoid conflicts
+        // Stop everything else first to avoid conflicts - ensures only ONE camera/res is active
         provider.unbindAll()
         activeCameraId = cameraId
+        activeResolution = Resolution(width, height)
 
-        val flow = cameraFlows.getOrPut(cameraId) {
+        val flowKey = "$cameraId:$width:$height"
+        val flow = cameraFlows.getOrPut(flowKey) {
             MutableSharedFlow(replay = 0, extraBufferCapacity = 5, onBufferOverflow = BufferOverflow.DROP_OLDEST)
         }
 
@@ -97,11 +112,10 @@ class CameraManager(private val context: Context) {
             .setResolutionSelector(
                 ResolutionSelector.Builder()
                     .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
-                    .setResolutionStrategy(ResolutionStrategy(android.util.Size(640, 480), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER))
+                    .setResolutionStrategy(ResolutionStrategy(android.util.Size(width, height), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER))
                     .build()
             )
 
-        // Target physical sensor if requested (e.g. 0:1 for Telephoto on S20 FE)
         if (parts.size == 2 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             androidx.camera.camera2.interop.Camera2Interop.Extender(builder)
                 .setPhysicalCameraId(parts[1])
@@ -120,7 +134,7 @@ class CameraManager(private val context: Context) {
 
         try {
             provider.bindToLifecycle(lifecycleOwner, selector, analysis)
-            Log.d("CameraManager", "Bound camera $cameraId")
+            Log.d("CameraManager", "Bound camera $cameraId at ${width}x${height}")
         } catch (e: Exception) {
             Log.e("CameraManager", "Failed to bind camera $cameraId", e)
         }
@@ -151,9 +165,13 @@ class CameraManager(private val context: Context) {
                 val capabilities = c.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
                 val isLogical = capabilities?.any { it == 11 } == true
 
-                result.add(CameraInfo(id, facing, type, focal, !isLogical))
+                val map = c.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+                val resolutions = map?.getOutputSizes(ImageFormat.YUV_420_888)?.map { 
+                    Resolution(it.width, it.height) 
+                }?.sortedByDescending { it.width * it.height } ?: emptyList()
 
-                // Expose sub-sensors - THIS IS WHERE THE REAL TELEPHOTO LIVES
+                result.add(CameraInfo(id, facing, type, focal, !isLogical, resolutions))
+
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && isLogical) {
                     c.physicalCameraIds.forEach { pId ->
                         val pC = manager.getCameraCharacteristics(pId)
@@ -163,7 +181,12 @@ class CameraManager(private val context: Context) {
                             pFocal < 5.8f -> "Wide"
                             else -> "Telephoto"
                         }
-                        result.add(CameraInfo("$id:$pId", facing, "$pType (Sensor $pId)", pFocal, true))
+                        val pMap = pC.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+                        val pResolutions = pMap?.getOutputSizes(ImageFormat.YUV_420_888)?.map { 
+                            Resolution(it.width, it.height) 
+                        }?.sortedByDescending { it.width * it.height } ?: emptyList()
+                        
+                        result.add(CameraInfo("$id:$pId", facing, "$pType (Sensor $pId)", pFocal, true, pResolutions))
                     }
                 }
             } catch (e: Exception) {
@@ -175,7 +198,6 @@ class CameraManager(private val context: Context) {
 
     fun startSupportedCameras(lifecycleOwner: LifecycleOwner) {
         lastLifecycleOwner = lifecycleOwner
-        // Start primary back camera by default
         getCameraInfos().firstOrNull { it.facing == "Back" && !it.id.contains(":") }?.let {
             startCamera(lifecycleOwner, it.id)
         }
@@ -186,13 +208,14 @@ class CameraManager(private val context: Context) {
     private fun processImage(imageProxy: ImageProxy, flow: MutableSharedFlow<ByteArray>) {
         try {
             val bitmap = try {
-                imageProxy.toBitmap().copy(Bitmap.Config.ARGB_8888, true)
-            } catch (e: Exception) {
+                imageProxy.toBitmap()
+            } catch (_: Exception) {
                 imageProxyToBitmapManual(imageProxy)
             }
             val out = ByteArrayOutputStream()
             bitmap.compress(Bitmap.CompressFormat.JPEG, 60, out)
             flow.tryEmit(out.toByteArray())
+            bitmap.recycle()
         } catch (e: Exception) {
             Log.e("CameraManager", "Processing error", e)
         } finally {
@@ -222,5 +245,6 @@ class CameraManager(private val context: Context) {
     fun stopStreaming() {
         cameraProvider?.unbindAll()
         activeCameraId = null
+        activeResolution = null
     }
 }

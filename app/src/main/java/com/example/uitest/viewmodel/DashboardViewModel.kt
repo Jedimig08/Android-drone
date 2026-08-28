@@ -2,8 +2,6 @@ package com.example.uitest.viewmodel
 
 import android.app.Application
 import android.net.Uri
-import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -19,7 +17,6 @@ import com.example.uitest.data.Widget
 import kotlinx.serialization.json.Json
 
 
-@RequiresApi(Build.VERSION_CODES.O)
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
     val uartManager = UartManager(application)
     val bluetoothManager = BluetoothClassicManager(application)
@@ -32,18 +29,17 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         layoutProvider = {
             val currentLayout = LayoutConfig(
                 columns = columns,
-                presets = statePresets.toLayoutPresets()
+                presets = statePresets.toLayoutPresets(),
             )
             Json.encodeToString(currentLayout)
         },
         uartManager = uartManager,
         bluetoothManager = bluetoothManager,
         cameraManager = cameraManager,
-        sensorManager = sensorManager,
-        onLogReceived = { id, text ->
-            updateLogById(id.toIntOrNull() ?: -1, text)
-        }
-    )
+        sensorManager = sensorManager
+    ) { id, text ->
+        updateLogById(id.toIntOrNull() ?: -1, text)
+    }
 
     init {
         server.start()
@@ -58,6 +54,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         uartManager.unregister()
         bluetoothManager.disconnect()
         sensorManager.stopAll()
+        cameraManager.stopStreaming()
     }
 
     fun updateLogById(id: Int, newText: String) {

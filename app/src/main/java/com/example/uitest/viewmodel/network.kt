@@ -4,9 +4,7 @@ import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
-import android.os.Build
 import android.os.PowerManager
-import androidx.annotation.RequiresApi
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
@@ -276,7 +274,6 @@ class DashboardServer(
     private val registeredEndpoints =
         Collections.synchronizedList(mutableListOf<Pair<String, String>>())
 
-    @RequiresApi(Build.VERSION_CODES.O)
     fun start() {
         registeredEndpoints.clear()
         // Acquire Locks to prevent sleep and throttling
@@ -359,7 +356,7 @@ class DashboardServer(
                         val text = json["text"]?.let { it as kotlinx.serialization.json.JsonPrimitive }?.content ?: ""
                         onLogReceived(id, text)
                         call.respond(HttpStatusCode.OK)
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         call.respond(HttpStatusCode.BadRequest)
                     }
                 }
@@ -413,7 +410,7 @@ class DashboardServer(
                             bluetoothManager.dataFlow.collect {
                                 send(it)
                             }
-                        } catch (e: Exception) {
+                        } catch (_: Exception) {
                             cancel()
                         }
                     }
@@ -494,12 +491,18 @@ class DashboardServer(
                     val cameras = cameraManager.getCameraInfos()
 
                     val cameraRows = cameras.joinToString("") { info ->
+                        val resLinks = info.supportedResolutions.take(8).joinToString(" ") { res ->
+                            "<a href='/stream/${info.id}?res=${res.width}x${res.height}' style='color:#007AFF; text-decoration:none; font-size:0.85em; margin-right:5px;'>[${res}]</a>"
+                        }
                         """
                         <tr>
-                            <td>${info.id}</td>
+                            <td><strong>${info.id}</strong></td>
                             <td>${info.facing}</td>
                             <td>${info.type}</td>
-                            <td><a href='/camera/${info.id}' style="background:#007AFF; color:white; padding:5px 10px; border-radius:4px; text-decoration:none;">View</a></td>
+                            <td>
+                                <a href='/camera/${info.id}' style="background:#007AFF; color:white; padding:4px 10px; border-radius:4px; text-decoration:none; font-weight:bold;">Viewer</a>
+                                <div style="margin-top:8px; color:#666;">Streams: $resLinks</div>
+                            </td>
                         </tr>
                         """
                     }
@@ -536,10 +539,17 @@ class DashboardServer(
 
                 get("/camera/{id}") {
                     val cameraId = call.parameters["id"] ?: ""
+                    val isMinimal = call.request.queryParameters["minimal"] == "true"
                     val cameras = cameraManager.getCameraInfos()
+                    val currentCamera = cameras.find { it.id == cameraId }
+                    
                     val otherCamerasLinks = cameras.filter { it.id != cameraId }.joinToString(" | ") { 
                         "<a href='/camera/${it.id}'>Camera ${it.id}</a>" 
                     }
+
+                    val resOptions = currentCamera?.supportedResolutions?.joinToString("") { 
+                        "<button onclick=\"changeRes('${it.width}x${it.height}')\">${it.width}x${it.height}</button>" 
+                    } ?: "No resolutions found"
 
                     val html = """
                         <html>
@@ -547,19 +557,26 @@ class DashboardServer(
                             <title>Camera $cameraId</title>
                             <style>
                                 body { margin: 0; background: #000; color: #fff; font-family: sans-serif; text-align: center; }
-                                .header { padding: 20px; background: #111; }
-                                img { max-width: 100%; height: auto; border: 2px solid #333; }
+                                .header { padding: 20px; background: #111; display: ${if (isMinimal) "none" else "block"}; }
+                                img { max-width: 100%; height: auto; border: 2px solid #333; margin-top: ${if (isMinimal) "0" else "10px"}; }
                                 .nav { padding: 10px; }
+                                .res-picker { padding: 10px; background: rgba(34,34,34,0.8); position: ${if (isMinimal) "fixed" else "static"}; top: 0; width: 100%; z-index: 100; }
                                 a { color: #007AFF; text-decoration: none; margin: 0 10px; }
+                                button { background: #444; color: white; border: 1px solid #666; padding: 5px 10px; margin: 2px; border-radius: 4px; cursor: pointer; }
+                                button:hover { background: #555; }
+                                .min-toggle { position: fixed; bottom: 10px; right: 10px; opacity: 0.3; }
+                                .min-toggle:hover { opacity: 1.0; }
                             </style>
                             <script>
+                                function changeRes(res) {
+                                    const img = document.getElementById('stream');
+                                    img.src = '/stream/$cameraId?res=' + res + '&t=' + Date.now();
+                                }
                                 function checkStream() {
                                     const img = document.getElementById('stream');
-                                    // If no frame in 3 seconds, maybe the camera needs a kick
                                     setTimeout(() => {
                                         if (img.naturalWidth === 0) {
-                                            console.log('Stream not starting, reloading image...');
-                                            img.src = img.src.split('?')[0] + '?t=' + Date.now();
+                                            img.src = img.src.split('&t=')[0] + '&t=' + Date.now();
                                         }
                                     }, 3000);
                                 }
@@ -572,7 +589,13 @@ class DashboardServer(
                                     <a href="/camera">&larr; Back to Hub</a> | $otherCamerasLinks
                                 </div>
                             </div>
+                            <div class="res-picker">
+                                <strong>${if (isMinimal) "" else "Resolutions:"}</strong> $resOptions
+                            </div>
                             <img id="stream" src="/stream/$cameraId">
+                            <div class="min-toggle">
+                                <a href="?minimal=${!isMinimal}" style="color:white; font-size:10px;">[Toggle UI]</a>
+                            </div>
                         </body>
                         </html>
                     """.trimIndent()
@@ -581,10 +604,14 @@ class DashboardServer(
 
                 get("/stream/{id}") {
                     val cameraId = call.parameters["id"] ?: return@get
+                    val resParam = call.request.queryParameters["res"] ?: "640x480"
+                    val parts = resParam.split("x")
+                    val width = parts.getOrNull(0)?.toIntOrNull() ?: 640
+                    val height = parts.getOrNull(1)?.toIntOrNull() ?: 480
+                    
                     val boundary = "frame"
                     call.respondBytesWriter(contentType = ContentType.parse("multipart/x-mixed-replace; boundary=$boundary")) {
-                        streamCamera(cameraManager.getFlow(cameraId), boundary
-                        )
+                        streamCamera(cameraManager.getFlow(cameraId, width, height), boundary)
                     }
                 }
 
@@ -675,6 +702,15 @@ class DashboardServer(
                     // Get the latest value from the flow's replay cache
                     val latestValue = flow.replayCache.firstOrNull() ?: "waiting for data"
                     call.respond(mapOf("id" to type, "value" to latestValue))
+                }
+
+                // JSON API for Cameras
+                get("/api/cameras") {
+                    if (!cameraManager.isReady()) {
+                        call.respond(HttpStatusCode.ServiceUnavailable, mapOf("error" to "Camera provider not ready"))
+                    } else {
+                        call.respond(cameraManager.getCameraInfos())
+                    }
                 }
 
                 get("/") {

@@ -38,8 +38,6 @@ import androidx.compose.ui.unit.dp
 import com.example.uitest.data.ModuleConfig
 import com.example.uitest.util.moveModule
 import com.example.uitest.viewmodel.DashboardViewModel
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 import androidx.compose.foundation.Image
@@ -217,16 +215,38 @@ fun DashboardPage(
                 }
 
                 if (editedType.startsWith("CAMERA")) {
+                    val parts = editedType.split(":")
+                    val cameraId = parts.getOrNull(1) ?: "0"
                     val cameras = remember { viewModel.cameraManager.getCameraInfos() }
+                    val selectedCamera = cameras.find { it.id == cameraId }
+                    
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Select Camera:", style = MaterialTheme.typography.labelSmall)
                     Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
                         cameras.forEach { camera ->
                             Button(
-                                onClick = { editedType = "CAMERA:${camera.id}" },
+                                onClick = { 
+                                    val resPart = parts.getOrNull(2) ?: "640x480"
+                                    editedType = "CAMERA:${camera.id}:$resPart" 
+                                },
                                 modifier = Modifier.padding(4.dp)
                             ) {
                                 Text("${camera.facing} ${camera.type}", fontSize = 10.sp)
+                            }
+                        }
+                    }
+
+                    if (selectedCamera != null && (selectedCamera.supportedResolutions.isNotEmpty())) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Select Resolution:", style = MaterialTheme.typography.labelSmall)
+                        Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                            selectedCamera.supportedResolutions.forEach { res ->
+                                Button(
+                                    onClick = { editedType = "CAMERA:$cameraId:${res.width}x${res.height}" },
+                                    modifier = Modifier.padding(4.dp)
+                                ) {
+                                    Text("${res.width}x${res.height}", fontSize = 10.sp)
+                                }
                             }
                         }
                     }
@@ -319,8 +339,13 @@ fun ModuleView(
     ) {
         when {
             module.type.startsWith("CAMERA") -> {
-                val cameraId = module.type.split(":").getOrNull(1) ?: "0"
-                val frame by viewModel.cameraManager.getFlow(cameraId).collectAsState(null)
+                val parts = module.type.split(":")
+                val cameraId = parts.getOrNull(1) ?: "0"
+                val res = parts.getOrNull(2)?.split("x")
+                val width = res?.getOrNull(0)?.toIntOrNull() ?: 640
+                val height = res?.getOrNull(1)?.toIntOrNull() ?: 480
+                
+                val frame by viewModel.cameraManager.getFlow(cameraId, width, height).collectAsState(null)
                 
                 frame?.let { bytes ->
                     val bitmap = remember(bytes) { 
