@@ -22,6 +22,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     val bluetoothManager = BluetoothClassicManager(application)
     val cameraManager = CameraManager(application)
     val sensorManager = SensorManager(application)
+    val tcpManager = TcpManager(application)
 
     private val server = DashboardServer(
         context = application,
@@ -36,7 +37,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         uartManager = uartManager,
         bluetoothManager = bluetoothManager,
         cameraManager = cameraManager,
-        sensorManager = sensorManager
+        sensorManager = sensorManager,
+        tcpManager = tcpManager
     ) { id, text ->
         updateLogById(id.toIntOrNull() ?: -1, text)
     }
@@ -55,6 +57,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         bluetoothManager.disconnect()
         sensorManager.stopAll()
         cameraManager.stopStreaming()
+        tcpManager.disconnect()
     }
 
     fun updateLogById(id: Int, newText: String) {

@@ -46,6 +46,7 @@ class DashboardServer(
     private val bluetoothManager: BluetoothClassicManager,
     private val cameraManager: CameraManager,
     private val sensorManager: SensorManager,
+    private val tcpManager: TcpManager,
     private val onLogReceived: (String, String) -> Unit
 ) {
 
@@ -439,6 +440,72 @@ class DashboardServer(
                     val address = call.receiveText()
                     val result = bluetoothManager.connect(address)
                     call.respondText(result)
+                }
+
+                register("/tcp", "TCP Link") {
+                    val controls = """
+                        <input type="text" id="ip" placeholder="IP Address" style="width: 50%;">
+                        <input type="number" id="port" placeholder="Port" value="8888" style="width: 20%;">
+                        <button onclick="
+                            const ip = document.getElementById('ip').value;
+                            const port = document.getElementById('port').value;
+                            fetch('/tcp-connect', {
+                                method:'POST',
+                                body: JSON.stringify({ip: ip, port: parseInt(port)})
+                            })
+                            .then(r => r.text())
+                            .then(m => appendLog('SYSTEM: ' + m));
+                        ">
+                            Connect
+                        </button>
+                        <br><br>
+                    """.trimIndent()
+
+                    call.respondText(
+                        terminalPage(
+                            title = "TCP Console",
+                            wsEndpoint = "/tcp-ws",
+                            sendEndpoint = "/tcp-send",
+                            extraControls = controls
+                        ),
+                        ContentType.Text.Html
+                    )
+                }
+
+                webSocket("/tcp-ws") {
+                    val job = launch {
+                        tcpManager.dataFlow.collect { data ->
+                            send(data)
+                        }
+                    }
+                    try {
+                        incoming.consumeEach { frame ->
+                            if (frame is Frame.Text) {
+                                tcpManager.send(frame.readText())
+                            }
+                        }
+                    } finally {
+                        job.cancel()
+                    }
+                }
+
+                post("/tcp-send") {
+                    val text = call.receiveText()
+                    tcpManager.send(text)
+                    call.respond(HttpStatusCode.OK)
+                }
+
+                post("/tcp-connect") {
+                    val body = call.receiveText()
+                    try {
+                        val json = kotlinx.serialization.json.Json.parseToJsonElement(body).let { it as kotlinx.serialization.json.JsonObject }
+                        val ip = json["ip"]?.let { it as kotlinx.serialization.json.JsonPrimitive }?.content ?: ""
+                        val port = json["port"]?.let { it as kotlinx.serialization.json.JsonPrimitive }?.content?.toIntOrNull() ?: 8888
+                        val result = tcpManager.connect(ip, port)
+                        call.respondText(result)
+                    } catch (_: Exception) {
+                        call.respondText("Invalid connection parameters", status = HttpStatusCode.BadRequest)
+                    }
                 }
 
                 register("/uart", "UART Terminal") {
